@@ -21,7 +21,9 @@ package org.sonar.plugins.ldap;
 
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -60,20 +62,23 @@ public class LdapGroupsProvider extends ExternalGroupsProvider {
     Set<String> groups = Sets.newHashSet();
     List<SonarException> sonarExceptions = new ArrayList<SonarException>();
     for (String serverKey : userMappings.keySet()) {
-      if (!groupMappings.containsKey(serverKey)) {
-        // No group mapping for this ldap instance.
-        continue;
-      }
-      SearchResult searchResult = searchUserGroups(username, sonarExceptions, serverKey);
+			String[] serverKeysForGroup = groupMappings
+						.get(serverKey)
+						.getGroupRequestServersOverride();
+			if (serverKeysForGroup == null) {
+				serverKeysForGroup = new String[] { serverKey };
+			}
+			
+			if (Collections.disjoint(groupMappings.keySet(), Arrays.asList(serverKeysForGroup))) {
+				// No group mapping for this ldap instance
+				continue;
+			}
+			LOG.debug("searchUserGroups({}, serverKey: {})", username, serverKey);
+			SearchResult searchResult = searchUserGroups(username, sonarExceptions, serverKey);
 
-      if (searchResult != null) {
-        try {
-          String[] serverKeysForGroup = groupMappings
-              .get(serverKey)
-              .getGroupRequestServersOverride();
-          if (serverKeysForGroup == null) {
-            serverKeysForGroup = new String[] { serverKey };
-          }
+			if (searchResult != null) {
+				LOG.debug("User Found({})", searchResult.getNameInNamespace());
+				try {
           for(String serverKeyForGroup : serverKeysForGroup)
           {
             NamingEnumeration<SearchResult> result = groupMappings
